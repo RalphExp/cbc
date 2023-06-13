@@ -44,12 +44,22 @@ class TypeChecker extends Visitor {
     }
     // #@@}
 
+    // Can not return struct, union and array
+    // note that C can return struct/union, but not in C-flat
     private void checkReturnType(DefinedFunction f) {
         if (isInvalidReturnType(f.returnType())) {
             error(f.location(), "returns invalid type: " + f.returnType());
         }
     }
 
+    // Parameters can not be struct, union, incomplete array and void
+    // note that in C, parameters can be struct and union.
+
+    // About incomplete array:
+    //   e.g. int a[3] is complete,
+    //        int a[] is complete,
+    //        int a[][3] is complete,
+    //    but int a[3][] is *not* complete
     private void checkParamTypes(DefinedFunction f) {
         for (Parameter param : f.parameters()) {
             if (isInvalidParameterType(param.type())) {
@@ -74,10 +84,16 @@ class TypeChecker extends Visitor {
     }
 
     private void checkVariable(DefinedVariable var) {
+        // variable type can not be void or incomplete array
         if (isInvalidVariableType(var.type())) {
             error(var.location(), "invalid variable type");
             return;
         }
+
+        // LHSType can not be struct, union, void, array.
+        // note that in C, LHS can be an array:
+        // e.g. int a[5] = {1, 2, 3, 4, 5};
+        // but C-Flat does not support this syntax;
         if (var.hasInitializer()) {
             if (isInvalidLHSType(var.type())) {
                 error(var.location(), "invalid LHS type: " + var.type());
@@ -90,6 +106,8 @@ class TypeChecker extends Visitor {
 
     public Void visit(ExprStmtNode node) {
         check(node.expr());
+        // can not be struct or union
+        // but C can
         if (isInvalidStatementType(node.expr().type())) {
             error(node, "invalid statement type: " + node.expr().type());
             return null;
@@ -153,7 +171,13 @@ class TypeChecker extends Visitor {
 
     public Void visit(AssignNode node) {
         super.visit(node);
+
+        // LHS can not be struct, union, void and array
+        // except when the array is passed as an parameter,
+        // in which case it is a pointer.
         if (! checkLHS(node.lhs())) return null;
+
+        // RHS can not be struct, union, void
         if (! checkRHS(node.rhs())) return null;
         node.setRHS(implicitCast(node.lhs().type(), node.rhs()));
         return null;
@@ -164,12 +188,17 @@ class TypeChecker extends Visitor {
         if (! checkLHS(node.lhs())) return null;
         if (! checkRHS(node.rhs())) return null;
         if (node.operator().equals("+") || node.operator().equals("-")) {
+            // note that we only need to check if lhs is pointer
+            // because if lhs is integer, it's always valid to use +
             if (node.lhs().type().isPointer()) {
                 mustBeInteger(node.rhs(), node.operator());
                 node.setRHS(integralPromotedExpr(node.rhs()));
                 return null;
             }
         }
+
+        // XXX: in cbc both the operands of the assign node must be
+        // pointer/integer, pointer case is already checked.
         if (! mustBeInteger(node.lhs(), node.operator())) return null;
         if (! mustBeInteger(node.rhs(), node.operator())) return null;
         Type l = integralPromotion(node.lhs().type());
@@ -609,6 +638,7 @@ class TypeChecker extends Visitor {
         return true;
     }
 
+    // XXX: Scalar means integer, pointer and enum
     private boolean mustBeScalar(ExprNode expr, String op) {
         if (! expr.type().isScalar()) {
             wrongTypeError(expr, op);

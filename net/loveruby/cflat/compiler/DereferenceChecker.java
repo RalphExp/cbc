@@ -112,6 +112,7 @@ class DereferenceChecker extends Visitor {
     // Expressions
     //
 
+    // XXX: PrefixOpNode and SuffixOpNode are not LValues
     public Void visit(PrefixOpNode node) {
         super.visit(node);
         if (! node.expr().isAssignable()) {
@@ -139,6 +140,9 @@ class DereferenceChecker extends Visitor {
         return null;
     }
 
+    // a[i];
+    // when DereferenceChecker is called, the type of the
+    // VariableNode is set, which is done in TypeResolver.
     public Void visit(ArefNode node) {
         super.visit(node);
         if (! node.expr().isPointer()) {
@@ -149,6 +153,7 @@ class DereferenceChecker extends Visitor {
         return null;
     }
 
+    // a.m
     public Void visit(MemberNode node) {
         super.visit(node);
         checkMemberRef(node.location(), node.expr().type(), node.member());
@@ -156,6 +161,7 @@ class DereferenceChecker extends Visitor {
         return null;
     }
 
+    // a->m
     public Void visit(PtrMemberNode node) {
         super.visit(node);
         if (! node.expr().isPointer()) {
