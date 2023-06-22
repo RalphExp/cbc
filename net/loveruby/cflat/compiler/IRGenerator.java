@@ -661,6 +661,15 @@ class IRGenerator implements ASTVisitor<Void, Expr> {
     }
     // #@@}
 
+    // For multidimension array: t[e][d][c][b][a] ary; the representation
+    // Node is as follows: (in reverse way)
+    // &ary[a0][b0][c0][d0][e0]
+    // XXX: is this representation wrong??
+    //     = &ary + edcb*a0 + edc*b0 + ed*c0 + e*d0 + e0
+    //     = &ary + (((((a0)*b + b0)*c + c0)*d + d0)*e + e0) * sizeof(t)
+    //
+
+    // XXX: baseExpr = t
     // #@@range/Aref{
     public Expr visit(ArefNode node) {
         Expr expr = transformExpr(node.baseExpr());
@@ -671,11 +680,14 @@ class IRGenerator implements ASTVisitor<Void, Expr> {
     }
     // #@@}
 
-    // For multidimension array: t[e][d][c][b][a] ary;
-    // &ary[a0][b0][c0][d0][e0]
-    //     = &ary + edcb*a0 + edc*b0 + ed*c0 + e*d0 + e0
-    //     = &ary + (((((a0)*b + b0)*c + c0)*d + d0)*e + e0) * sizeof(t)
-    //
+    // XXX: transformIndex means to calculate this:
+    // e0*(dcba) + d0*(cba) + c0*ba + b0*a + a0
+    // a0 + a * (b0 + c0*b + d0*cb + e0 * dcb)
+
+    // node.index() == a0
+    // node.length() == a
+    // return a0 + a * (b0 + c0*b + d0*cb + e0 * dcb);
+    // (b0 + c0*b + d0*cb + e0 * dcb) = transformIndex((ArefNode)node.expr())));
     private Expr transformIndex(ArefNode node) {
         if (node.isMultiDimension()) {
             return new Bin(int_t(), Op.ADD,
@@ -690,6 +702,7 @@ class IRGenerator implements ASTVisitor<Void, Expr> {
     }
 
     // #@@range/Member{
+    // a.m
     public Expr visit(MemberNode node) {
         Expr expr = addressOf(transformExpr(node.expr()));
         Expr offset = ptrdiff(node.offset());
@@ -701,6 +714,7 @@ class IRGenerator implements ASTVisitor<Void, Expr> {
     // #@@}
 
     // #@@range/PtrMember{
+    // a->m
     public Expr visit(PtrMemberNode node) {
         Expr expr = transformExpr(node.expr());
         Expr offset = ptrdiff(node.offset());
