@@ -9,6 +9,7 @@ public class ArefNode extends LHSNode {
         this.index = index;
     }
 
+    // e.g. expr of a[x][y] is a[x], i.e. ArefNode(a, x)
     public ExprNode expr() { return expr; }
     public ExprNode index() { return index; }
 

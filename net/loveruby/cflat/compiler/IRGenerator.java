@@ -489,6 +489,7 @@ class IRGenerator implements ASTVisitor<Void, Expr> {
         }
         else {
             // lhs = rhs -> tmp = rhs, lhs = tmp, tmp
+            // if is not statment, we should avoid side-effect
             // #@@range/Assign_expr{
             DefinedVariable tmp = tmpVar(node.rhs().type());
             assign(rloc, ref(tmp), transformExpr(node.rhs()));
@@ -510,6 +511,7 @@ class IRGenerator implements ASTVisitor<Void, Expr> {
     }
     // #@@}
 
+    // only ++ or -- is allowed
     public Expr visit(PrefixOpNode node) {
         // ++expr -> expr += 1
         Type t = node.expr().type();
@@ -539,7 +541,7 @@ class IRGenerator implements ASTVisitor<Void, Expr> {
             assign(loc, expr, bin(op, t, ref(v), imm(t, 1)));
             return ref(v);
         }
-        else {
+        else { // expr is Memory
             // cont(expr++) -> a = &expr; v = *a; *a = *a + 1; cont(v)
             // #@@range/SuffixOp_expr{
             DefinedVariable a = tmpVar(pointerTo(t));
@@ -561,7 +563,7 @@ class IRGenerator implements ASTVisitor<Void, Expr> {
             assign(loc, lhs, bin(op, lhsType, lhs, rhs));
             return isStatement() ? null : lhs;
         }
-        else {
+        else { // lhs is Memory
             // cont(lhs += rhs) -> a = &lhs; *a = *a + rhs; cont(*a)
             DefinedVariable a = tmpVar(pointerTo(lhsType));
             assign(loc, ref(a), addressOf(lhs));
